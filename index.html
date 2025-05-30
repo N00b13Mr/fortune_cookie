@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fortune Cookie Fun</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom font for a bit more personality */
+        @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Inter:wght@400;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        h1, #fortuneMessage {
+            font-family: 'Caveat', cursive;
+        }
+
+        /* Keyframe animation for the cookie pop */
+        @keyframes cookiePop {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .animate-cookie-pop {
+            animation: cookiePop 0.3s ease-in-out;
+        }
+
+        /* Initial state for fortune paper to ensure it's correctly positioned before JS adds animation classes */
+        /* It's positioned relative to its parent #cookie-wrapper */
+        #fortunePaper {
+            /* Centered horizontally, then slightly above vertical center of parent, then scaled down and rotated */
+            transform: translate(-50%, -60%) scale(0.75) rotate(-5deg);
+            /* These Tailwind classes achieve similar initial visual state but JS will manage them for animation */
+            /* opacity-0 scale-75 -rotate-3 -translate-y-1/3 (relative to its own size after centering) */
+        }
+
+        /* Ensure the cookie SVG scales nicely and maintains aspect ratio */
+        #fortuneCookie svg {
+            width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-amber-200 via-orange-300 to-yellow-400 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-yellow-500 selection:text-white">
+
+    <div id="app-container" class="text-center w-full max-w-md">
+        <h1 class="text-5xl md:text-6xl font-bold text-yellow-700 mb-6 md:mb-10 drop-shadow-sm">Your Fortune Awaits!</h1>
+
+        <div id="cookie-wrapper" class="relative mb-6 h-48 md:h-56 flex items-center justify-center">
+            <div id="fortuneCookie" class="w-48 h-auto md:w-56 cursor-pointer transition-transform duration-150 ease-in-out hover:scale-105 active:scale-100 focus:outline-none" tabindex="0" aria-label="Open fortune cookie">
+                <svg viewBox="0 0 100 75" class="drop-shadow-lg">
+                    <path d="M10 55 C 10 20, 90 20, 90 55 C 70 75, 30 75, 10 55 Z M15 52 C 35 68, 65 68, 85 52 C 70 40, 30 40, 15 52 Z" fill="#FDE047" stroke="#F59E0B" stroke-width="2" fill-rule="evenodd"/>
+                    <path d="M15 52 C 30 40, 70 40, 85 52" stroke="#E17726" stroke-width="1.5" fill="none" />
+                </svg>
+            </div>
+
+            <div id="fortunePaper"
+                 class="absolute left-1/2 top-1/2 w-4/5 max-w-[200px] md:max-w-xs bg-white/95 p-3 md:p-4 rounded-md shadow-xl
+                        opacity-0 transition-all duration-500 ease-out"
+                 aria-live="polite">
+                <p id="fortuneMessage" class="text-lg md:text-xl text-yellow-800"></p>
+            </div>
+        </div>
+
+        <button id="newCookieButton" class="mt-4 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2.5 px-8 rounded-full shadow-md transition-all duration-200 ease-in-out transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-opacity-75 hidden">
+            Another Fortune!
+        </button>
+
+        <p id="promptText" class="mt-8 md:mt-12 text-md text-yellow-700/80">Click the cookie to reveal your fortune!</p>
+    </div>
+
+    <script>
+        const fortuneCookieElement = document.getElementById('fortuneCookie');
+        const fortunePaperElement = document.getElementById('fortunePaper');
+        const fortuneMessageElement = document.getElementById('fortuneMessage');
+        const newCookieButtonElement = document.getElementById('newCookieButton');
+        const promptTextElement = document.getElementById('promptText');
+
+        const fortunes = [
+            "A beautiful, smart, and loving person will be coming into your life.",
+            "Your talents will be recognized and suitably rewarded.",
+            "You will soon be surrounded by good friends and laughter.",
+            "Adventure awaits you this year. Embrace it!",
+            "A pleasant surprise is waiting for you very soon.",
+            "You will make a significant change for the better.",
+            "The world is your oyster. Go find your pearl!",
+            "Good things come to those who believe, better things come to those who are patient, and the best things come to those who don't give up.",
+            "Your creativity will shine brightly today.",
+            "An exciting opportunity is just around the corner.",
+            "Today is your lucky day! Make the most of it.",
+            "Believe in yourself and all that you are. Know that there is something inside you that is greater than any obstacle.",
+            "Happiness is not by chance, but by choice. Choose it.",
+            "You are destined for great things. Keep pushing forward.",
+            "Kindness is a language which the deaf can hear and the blind can see. Spread it.",
+            "A journey of a thousand miles begins with a single tap... of this cookie!",
+            "Don't be afraid to dream a little bigger, darling.",
+            "The best way to predict the future is to create it. Start now!",
+            "You are capable of amazing things. Yes, you!",
+            "Something wonderful is about to happen.",
+            "The cookie of life crumbles, but fortunes last forever (or until the next click).",
+            "You have a charming way with words... and cookies.",
+            "Look for the good in every day, even if some days you have to look a little harder.",
+            "Your future is looking as bright as a freshly baked cookie!",
+            "A smile is the shortest distance between two people. Share yours!"
+        ];
+
+        let lastFortuneIndex = -1;
+        let cookieClickable = true;
+
+        function showFortune() {
+            if (!cookieClickable) return;
+            cookieClickable = false;
+
+            // Cookie animation (visual feedback)
+            fortuneCookieElement.classList.add('animate-cookie-pop');
+            setTimeout(() => {
+                fortuneCookieElement.classList.remove('animate-cookie-pop');
+            }, 300); // Duration of the pop animation
+
+            // Select a new fortune, try not to repeat immediately
+            let randomIndex;
+            if (fortunes.length === 1) {
+                randomIndex = 0;
+            } else {
+                do {
+                    randomIndex = Math.floor(Math.random() * fortunes.length);
+                } while (randomIndex === lastFortuneIndex);
+            }
+            lastFortuneIndex = randomIndex;
+
+            fortuneMessageElement.textContent = fortunes[randomIndex];
+
+            // Animate paper in:
+            // Final state: centered, slightly above, normal scale, slight rotation
+            fortunePaperElement.style.transform = 'translate(-50%, -70%) scale(1) rotate(2deg)';
+            fortunePaperElement.classList.remove('opacity-0');
+            fortunePaperElement.classList.add('opacity-100');
+
+
+            // Update UI elements
+            if (promptTextElement) promptTextElement.classList.add('hidden');
+            newCookieButtonElement.classList.remove('hidden');
+            
+            // Make cookie non-interactive while fortune is shown, button will reset
+            fortuneCookieElement.removeEventListener('click', showFortune);
+            fortuneCookieElement.removeEventListener('keydown', handleCookieKeyDown);
+
+
+        }
+
+        function resetCookie() {
+            // Animate paper out:
+            // Back to initial animated-out state
+            fortunePaperElement.style.transform = 'translate(-50%, -60%) scale(0.75) rotate(-5deg)';
+            fortunePaperElement.classList.add('opacity-0');
+            fortunePaperElement.classList.remove('opacity-100');
+
+            // Delay re-attaching event listener and showing prompt to allow animation to finish
+            setTimeout(() => {
+                if (promptTextElement) promptTextElement.classList.remove('hidden');
+                newCookieButtonElement.classList.add('hidden');
+                
+                fortuneCookieElement.addEventListener('click', showFortune);
+                fortuneCookieElement.addEventListener('keydown', handleCookieKeyDown);
+                cookieClickable = true;
+            }, 500); // Match paper animation duration
+        }
+        
+        function handleCookieKeyDown(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault(); // Prevent scrolling on spacebar
+                showFortune();
+            }
+        }
+
+        fortuneCookieElement.addEventListener('click', showFortune);
+        fortuneCookieElement.addEventListener('keydown', handleCookieKeyDown);
+        newCookieButtonElement.addEventListener('click', resetCookie);
+
+        // Set initial transform for paper via JS to ensure it's applied after element is ready
+        // This helps ensure the transition fires correctly on the first click.
+        fortunePaperElement.style.transform = 'translate(-50%, -60%) scale(0.75) rotate(-5deg)';
+
+    </script>
+</body>
+</html>
